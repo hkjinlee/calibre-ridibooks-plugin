@@ -1,0 +1,71 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: \n"
+"POT-Creation-Date: 2015-05-31 18:17+0900\n"
+"PO-Revision-Date: 2015-05-31 18:18+0900\n"
+"Last-Translator: Jin, Heonkyu <heonkyu.jin@gmail.com>\n"
+"Language-Team: \n"
+"Language: ko\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Poedit 1.8.1\n"
+"X-Poedit-Basepath: ../\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"X-Poedit-SearchPath-0: .\n"
+
+#: __init__.py:26
+msgid "Downloads metadata and covers from ridibooks.com"
+msgstr "리디북스(ridibooks.com)에서 책 정보와 표지 다운로드"
+
+#: common_utils.py:236
+msgid "Restart required"
+msgstr "다시 시작해야 합니다"
+
+#: common_utils.py:237
+msgid "Title image not found - you must restart Calibre before using this plugin!"
+msgstr ""
+
+#: common_utils.py:517
+msgid "Undefined"
+msgstr "없음"
+
+#: common_utils.py:603
+msgid "Restart calibre now"
+msgstr "calibre를 재시작하세요"
+
+#: config.py:117
+msgid "Naverbook Genre"
+msgstr ""
+
+#: config.py:117
+msgid "Maps to Calibre Tag(s)"
+msgstr ""
+
+#: config.py:187
+msgid "Naverbook genre to calibre tag mappings"
+msgstr ""
+
+#: config.py:200
+msgid "Add genre mapping"
+msgstr ""
+
+#: config.py:207
+msgid "Delete genre mapping"
+msgstr ""
+
+#: config.py:214
+msgid "Rename Goodreads genre"
+msgstr ""
+
+#: config.py:221
+msgid "Reset to plugin default mappings"
+msgstr ""
+
+#: config.py:227
+msgid "Other options"
+msgstr ""
+
+#: config.py:286 config.py:317
+msgid "Are you sure?"
+msgstr ""
