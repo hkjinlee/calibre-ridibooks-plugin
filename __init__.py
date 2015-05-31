@@ -170,25 +170,21 @@ class RidiBooks(Source):
         title_tokens = list(self.get_title_tokens(orig_title))
         author_tokens = list(self.get_author_tokens(orig_authors, True))
 
-        matched_node = None
-        if isbn:
-            matched_node = search_result[0]
-        else:
-            import difflib
-            similarities = []
-            for i in range(len(search_result)):
-                title = search_result[i].xpath('.//a[@class="title_link "]')[0].text_content().strip()
-                author = search_result[i].xpath('.//li[@class="author "]//a')[0].text_content().strip()
-                log.info('Compare %s (%s) with %s (%s)' % (title, author, 
-                            ' '.join(title_tokens), 
-                            ' '.join(author_tokens)))
-                title_similarity = difflib.SequenceMatcher(None, 
-                        title.replace(' ', ''), ''.join(title_tokens)).ratio()
-                author_similarity = difflib.SequenceMatcher(None, 
-                        author.replace(' ', ''), ''.join(author_tokens)).ratio()
-                similarities.append(title_similarity * author_similarity)
+        import difflib
+        similarities = []
+        for i in range(len(search_result)):
+            title = search_result[i].xpath('.//a[@class="title_link "]')[0].text_content().strip()
+            author = search_result[i].xpath('.//li[@class="author "]//a')[0].text_content().strip()
+            log.info('Compare %s (%s) with %s (%s)' % (title, author, 
+                        ' '.join(title_tokens), 
+                        ' '.join(author_tokens)))
+            title_similarity = difflib.SequenceMatcher(None, 
+                    title.replace(' ', ''), ''.join(title_tokens)).ratio()
+            author_similarity = difflib.SequenceMatcher(None, 
+                    author.replace(' ', ''), ''.join(author_tokens)).ratio()
+            similarities.append(title_similarity * author_similarity)
 
-            matched_node = search_result[similarities.index(max(similarities))]
+        matched_node = search_result[similarities.index(max(similarities))]
 
         if matched_node is None:
             log.error('Rejecting as not close enough match: %s %s' % (title, authors))
