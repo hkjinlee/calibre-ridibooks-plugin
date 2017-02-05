@@ -19,7 +19,10 @@ from calibre.ebooks.metadata.sources.base import Source
 from calibre.utils.icu import lower
 from calibre.utils.cleantext import clean_ascii_chars
 
-load_translations()
+try:
+    load_translations()
+except NameError:
+    pass
 
 class RidiBooks(Source):
     name = 'RidiBooks'
@@ -163,7 +166,7 @@ class RidiBooks(Source):
         return None
 
     def _parse_search_results(self, log, isbn, orig_title, orig_authors, root, matches, timeout):
-        search_result = root.xpath('//div[@class="book_wrapper"]')
+        search_result = root.xpath('//div[@class="book_metadata_wrapper"]')
         if not search_result:
             return
         log.info(search_result[0])
@@ -173,8 +176,8 @@ class RidiBooks(Source):
         import difflib
         similarities = []
         for i in range(len(search_result)):
-            title = search_result[i].xpath('.//a[@class="title_link "]')[0].text_content().strip()
-            author = search_result[i].xpath('.//li[@class="author "]//a')[0].text_content().strip()
+            title = search_result[i].xpath('.//span[@class="title_text"]')[0].text_content().strip()
+            author = search_result[i].xpath('.//p[@class="book_metadata author "]/a')[0].text_content().strip()
             log.info('Compare %s (%s) with %s (%s)' % (title, author, 
                         ' '.join(title_tokens), 
                         ' '.join(author_tokens)))
@@ -239,38 +242,38 @@ if __name__ == '__main__': # tests
     from calibre.ebooks.metadata.sources.test import (test_identify_plugin,
             title_test, authors_test, series_test)
 
-    test_identify_plugin(RidiBooks.name,
-        [
-            (# A book with an ISBN
-                {'identifiers':{'isbn': '9780385340588'},
-                    'title':'61 Hours', 'authors':['Lee Child']},
-                [title_test('61 Hours', exact=True),
-                 authors_test(['Lee Child']),
-                 series_test('Jack Reacher', 14.0)]
-            ),
+    test_identify_plugin(RidiBooks.name, [
+        (# 정의란 무엇인가
+            {
+                'identifiers': {'ridibooks': '593000535'}
+            },
+            [
+                title_test(u'정의란 무엇인가', exact=True),
+                authors_test([u'마이클 샌델', u'김명철(역자)'])
+            ]
+        ),
 
-            (# A book throwing an index error
-                {'title':'The Girl Hunters', 'authors':['Mickey Spillane']},
-                [title_test('The Girl Hunters', exact=True),
-                 authors_test(['Mickey Spillane']),
-                 series_test('Mike Hammer', 7.0)]
-            ),
+        (# 세상에서 제일 쉬운 회계학
+            {
+                'title':u'회계학', 
+                'authors':[u'구보 유키야']
+            },
+            [
+                title_test(u'세상에서 가장 쉬운 회계학', exact=True),
+                authors_test([u'구보 유키야', u'안혜은(역자)'])
+            ]
+        ),
 
-            (# A book with no ISBN specified
-                {'title':"Playing with Fire", 'authors':['Derek Landy']},
-                [title_test("Playing with Fire", exact=True),
-                 authors_test(['Derek Landy']),
-                 series_test('Skulduggery Pleasant', 2.0)]
-            ),
-
-            (# A book with a Goodreads id
-                {'identifiers':{'goodreads': '6977769'},
-                    'title':'61 Hours', 'authors':['Lee Child']},
-                [title_test('61 Hours', exact=True),
-                 authors_test(['Lee Child']),
-                 series_test('Jack Reacher', 14.0)]
-            ),
-
-        ])
+        (# 테메레르 6권
+            {
+                'title':u"테메레르 큰바다뱀", 
+            },
+            [
+                title_test(u"테메레르 6권 - 큰바다뱀들의 땅", exact=True),
+                authors_test([u'나오미 노빅', u'공보경(역자)']),
+                series_test('테메레르', 6.0)
+            ]
+        ),
+    ], fail_missing_meta=False)
 
 

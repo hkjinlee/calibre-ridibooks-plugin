@@ -69,7 +69,7 @@ class Worker(Thread): # Get details
             attr = getattr(e, 'args', [None])
             attr = attr if attr else [None]
             if isinstance(attr[0], socket.timeout):
-                msg = 'Naver timed out. Try again later.'
+                msg = 'Ridibooks timed out. Try again later.'
                 self.log.error(msg)
             else:
                 msg = 'Failed to make details query: %r'%self.url
@@ -82,7 +82,7 @@ class Worker(Thread): # Get details
         try:
             root = fromstring(clean_ascii_chars(raw))
         except:
-            msg = 'Failed to parse Naver details page: %r'%self.url
+            msg = 'Failed to parse Ridibooks details page: %r'%self.url
             self.log.exception(msg)
             return
 
@@ -130,7 +130,7 @@ class Worker(Thread): # Get details
 
         if not title or not authors or not ridibooks_id:
             self.log.error('Could not find title/authors/ridibooks id for %r'%self.url)
-            self.log.error('Naverbook: %r Title: %r Authors: %r'%(ridibooks_id, title,
+            self.log.error('Ridibooks: %r Title: %r Authors: %r'%(ridibooks_id, title,
                 authors))
             return
 
@@ -173,6 +173,8 @@ class Worker(Thread): # Get details
             tags = self.parse_tags(root)
             if tags:
                 mi.tags = tags
+            else:
+                mi.tags = []
         except:
             self.log.exception('Error parsing tags for url: %r'%self.url)
 
@@ -256,11 +258,13 @@ class Worker(Thread): # Get details
         if not base_node:
             return
 
-        authors = base_node.xpath('./a/text()')
-        author_roles = map(lambda x: re.sub(',', '', x.strip()), base_node.xpath('./text()'))
+        authors = base_node.xpath('./span/a/text()')
+        self.log.debug(authors)
+        author_roles = map(lambda x: re.sub(',', '', x.strip()), base_node.xpath('./span/text()'))
+        self.log.debug(author_roles)
         author_index_max = author_roles.index(u'저')
         translator_index_max = author_roles.index(u'역')
-        for i in range(author_index_max, translator_index_max):
+        for i in range(author_index_max + 1, translator_index_max + 1):
             self.log.info(i)
             authors[i] = authors[i] + u'(역자)'
         self.log.info(authors)

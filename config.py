@@ -24,7 +24,7 @@ from calibre.gui2.complete2 import EditWithComplete
 from calibre.gui2.metadata.config import ConfigWidget as DefaultConfigWidget
 from calibre.utils.config import JSONConfig
 
-from calibre_plugins.naverbook.common_utils import ReadOnlyTableWidgetItem
+from calibre_plugins.ridibooks.common_utils import ReadOnlyTableWidgetItem
 
 STORE_NAME = 'Options'
 KEY_GET_ALL_AUTHORS = 'getAllAuthors'
@@ -98,7 +98,7 @@ DEFAULT_STORE_VALUES = {
 }
 
 # This is where all preferences for this plugin will be stored
-plugin_prefs = JSONConfig('plugins/naverbook')
+plugin_prefs = JSONConfig('plugins/ridibooks')
 
 # Set defaults
 plugin_prefs.defaults[STORE_NAME] = DEFAULT_STORE_VALUES
@@ -114,7 +114,7 @@ class GenreTagMappingsTableWidget(QTableWidget):
         self.clear()
         self.setAlternatingRowColors(True)
         self.setRowCount(len(tag_mappings))
-        header_labels = [_('Naverbook Genre'), _('Maps to Calibre Tag(s)')]
+        header_labels = [_('Ridibooks Genre'), _('Maps to Calibre Tag(s)')]
         self.setColumnCount(len(header_labels))
         self.setHorizontalHeaderLabels(header_labels)
         self.verticalHeader().setDefaultSectionSize(24)
@@ -184,7 +184,7 @@ class ConfigWidget(DefaultConfigWidget):
         all_tags = get_current_db().all_tags()
 
         self.gb.setMaximumHeight(80)
-        genre_group_box = QGroupBox(_('Naverbook genre to calibre tag mappings'), self)
+        genre_group_box = QGroupBox(_('Ridibooks genre to calibre tag mappings'), self)
         self.l.addWidget(genre_group_box, self.l.rowCount(), 0, 1, 2)
         genre_group_box_layout = QVBoxLayout()
         genre_group_box.setLayout(genre_group_box_layout)
