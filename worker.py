@@ -11,19 +11,21 @@ import socket, re, datetime
 from collections import OrderedDict
 from threading import Thread
 
-from lxml.html import fromstring, tostring
+import lxml.html
+import json
 
 from calibre.ebooks.metadata.book.base import Metadata
 from calibre.library.comments import sanitize_comments_html
-from calibre.utils.cleantext import clean_ascii_chars
+from calibre.utils.cleantext import clean_ascii_chars, unescape
 from calibre.utils.localization import canonicalize_lang
+from calibre.utils.date import utc_tz
 
 import calibre_plugins.ridibooks.config as cfg
 
 class Worker(Thread): # Get details
 
     '''
-    Get book details from Goodreads book page in a separate thread
+    Get book details from Ridibooks page in a separate thread
     '''
 
     def __init__(self, url, result_queue, browser, log, relevance, plugin, timeout=20):
@@ -33,7 +35,6 @@ class Worker(Thread): # Get details
         self.log, self.timeout = log, timeout
         self.relevance, self.plugin = relevance, plugin
         self.browser = browser.clone_browser()
-        self.cover_url = self.ridibooks_id = self.isbn = None
 
         lm = {
                 'eng': ('English', 'Englisch'),
@@ -53,283 +54,79 @@ class Worker(Thread): # Get details
 
     def run(self):
         try:
-            self.get_details()
+            self.load_details(self.url, self.timeout)
         except:
             self.log.exception('get_details failed for url: %r'%self.url)
 
-    def get_details(self):
+    def load_details(self, url, timeout):
+        def _format_item(str):
+            return re.sub('^"(.*)"$', '\\1', unescape(str))
+
+        def _format_list(str):
+            return [_.strip() for _ in _format_item(str).split(',')]
+
+        def _find_meta(node, property):
+            return [_.get('content') for _ in node if _.get('property') == property][0]
+
+        def _format_date(date_text):
+            year = int(date_text[0:4])
+            month = int(date_text[4:6]) 
+            day = int(date_text[6:])
+            return datetime.datetime(year, month, day, tzinfo=utc_tz)
+
         try:
-            self.log.info('Ridibooks url: %r' % self.url)
-            raw = self.browser.open_novisit(self.url, timeout=self.timeout).read().strip()
+            response = self.browser.open(url, timeout=timeout)
+            root = lxml.html.fromstring(response.read())
+
+            # <meta> tag에서 불러오는 항목
+            # 책ID, 제목, ISBN, 이미지URL, 평점
+            meta = root.xpath('//meta[starts-with(@property, "og") or starts-with(@property, "books")]')
+
+            # schema.org JSON에서 불러오는 항목
+            # 제목, 저자, 책소개, 출판사
+            ld_json = root.xpath('//script[@type="application/ld+json"]/text()')
+            ld = [json.loads(_) for _ in ld_json]
+            book_info = [_ for _ in ld if _['@type'] == 'Book'][0]
         except Exception as e:
-            if callable(getattr(e, 'getcode', None)) and \
-                    e.getcode() == 404:
-                self.log.error('URL malformed: %r'%self.url)
-                return
-            attr = getattr(e, 'args', [None])
-            attr = attr if attr else [None]
-            if isinstance(attr[0], socket.timeout):
-                msg = 'Ridibooks timed out. Try again later.'
-                self.log.error(msg)
-            else:
-                msg = 'Failed to make details query: %r'%self.url
-                self.log.exception(msg)
-            return
+            self.log.exception(e)
 
-        raw = raw.decode('utf-8', errors='replace')
-        #open('c:\\ridibooks.html', 'wb').write(raw)
+        ridibooks_id = re.search('id=([0-9]+)', url).group(1)
+        isbn = _find_meta(meta, 'books:isbn')
+        cover_url = _find_meta(meta, 'og:image')
 
-        try:
-            root = fromstring(clean_ascii_chars(raw))
-        except:
-            msg = 'Failed to parse Ridibooks details page: %r'%self.url
-            self.log.exception(msg)
-            return
-
-        try:
-            # Look at the <title> attribute for page to make sure that we were actually returned
-            # a details page for a book. If the user had specified an invalid ISBN, then the results
-            # page will just do a textual search.
-            title = root.xpath('//meta[@property="og:title"]/@content')
-            if title:
-                if title is None:
-                    self.log.error('Failed to see search results in page title: %r'%self.url)
-                    return
-        except:
-            msg = 'Failed to read ridibooks page title: %r'%self.url
-            self.log.exception(msg)
-            return
-
-        errmsg = root.xpath('//*[@id="errorMessage"]')
-        if errmsg:
-            msg = 'Failed to parse ridibooks details page: %r'%self.url
-            msg += tostring(errmsg, method='text', encoding=unicode).strip()
-            self.log.error(msg)
-            return
-
-        self.parse_details(root)
-
-    def parse_details(self, root):
-        try:
-            ridibooks_id = self.parse_ridibooks_id(self.url)
-        except:
-            self.log.exception('Error parsing ridibooks id for url: %r'%self.url)
-            ridibooks_id = None
-
-        try:
-            (title, series, series_index) = self.parse_title_series(root)
-        except:
-            self.log.exception('Error parsing title and series for url: %r'%self.url)
-            title = series = series_index = None
-
-        try:
-            authors = self.parse_authors(root)
-        except:
-            self.log.exception('Error parsing authors for url: %r'%self.url)
-            authors = []
-
-        if not title or not authors or not ridibooks_id:
-            self.log.error('Could not find title/authors/ridibooks id for %r'%self.url)
-            self.log.error('Ridibooks: %r Title: %r Authors: %r'%(ridibooks_id, title,
-                authors))
-            return
+        title = _find_meta(meta, 'og:title')
+        authors = _format_list(book_info['author']['name'])
+        if book_info.has_key('translator'):
+            authors.extend([_ + u'(역자)' for _ in _format_list(book_info['translator']['name'])])
 
         mi = Metadata(title, authors)
-        if series:
-            mi.series = series
-            mi.series_index = series_index
         mi.set_identifier('ridibooks', ridibooks_id)
-        self.ridibooks_id = ridibooks_id
 
-        try:
-            isbn = self.parse_isbn(root)
-            if isbn:
-                self.isbn = mi.isbn = isbn
-        except:
-            self.log.exception('Error parsing ISBN for url: %r'%self.url)
+        mi.cover_url = cover_url
+        mi.has_cover = bool(cover_url)
 
-        try:
-            mi.rating = self.parse_rating(root)
-        except:
-            self.log.exception('Error parsing ratings for url: %r'%self.url)
+        mi.publisher = _format_item(book_info['publisher']['name'])
+        mi.pubdate = _format_date(book_info['datePublished'])
 
-        try:
-            (mi.publisher, mi.pubdate) = self.parse_publisher_date(root)
-        except:
-            self.log.exception('Error parsing publisher/date for url: %r'%self.url)
+        mi.comments = _format_item(book_info['description'])
+        mi.rating = float(_find_meta(meta, 'books:rating:normalized_value'))
 
-        try:
-            mi.comments = self.parse_comments(root)
-        except:
-            self.log.exception('Error parsing comments for url: %r'%self.url)
+        series = re.search(u'(.*)\s*(\d+)권', title)
+        if series:
+            mi.series = series.group(1)
+            mi.series_index = float(series.group(2))
 
-        try:
-            self.cover_url = self.parse_cover(root)
-        except:
-            self.log.exception('Error parsing cover for url: %r'%self.url)
-        mi.has_cover = bool(self.cover_url)
-
-        try:
-            tags = self.parse_tags(root)
-            if tags:
-                mi.tags = tags
-            else:
-                mi.tags = []
-        except:
-            self.log.exception('Error parsing tags for url: %r'%self.url)
-
-        try:
-            lang = self._parse_language(root)
-            if lang:
-                mi.language = lang
-        except:
-            self.log.exception('Error parsing language for url: %r'%self.url)
-
+        mi.language = 'Korean'
         mi.source_relevance = self.relevance
 
-        if self.ridibooks_id:
-            if self.isbn:
-                self.plugin.cache_isbn_to_identifier(self.isbn, self.ridibooks_id)
-            if self.cover_url:
-                self.plugin.cache_identifier_to_cover_url(self.ridibooks_id,
-                        self.cover_url)
+        if ridibooks_id:
+            if isbn:
+                self.plugin.cache_isbn_to_identifier(isbn, ridibooks_id)
+            if cover_url:
+                self.plugin.cache_identifier_to_cover_url(ridibooks_id, cover_url)
 
         self.plugin.clean_downloaded_metadata(mi)
-
         self.result_queue.put(mi)
-
-    def parse_ridibooks_id(self, url):
-        return re.search('/v2/Detail\?id=(\d+)', url).groups(0)[0]
-
-    def parse_title_series(self, root):
-        title_node = root.xpath('//meta[@property="og:title"]/@content')
-        if not title_node:
-            return (None, None, None)
-        title_text = title_node[0].strip()
-        if title_text.find('(') == -1:
-            return (title_text, None, None)
-        # Contains a Title and possibly a series. Possible values currently handled:
-        # "Some title (Omnibus)"
-        # "Some title (#1-3)"
-        # "Some title (Series #1)"
-        # "Some title (Series (digital) #1)"
-        # "Some title (Series #1-5)"
-        # "Some title (NotSeries #2008 Jan)"
-        # "Some title (Omnibus) (Series #1)"
-        # "Some title (Omnibus) (Series (digital) #1)"
-        # "Some title (Omnibus) (Series (digital) #1-5)"
-        text_split = title_text.rpartition('(')
-        title = text_split[0]
-        series_info = text_split[2]
-        hash_pos = series_info.find('#')
-        if hash_pos <= 0:
-            # Cannot find the series # in expression or at start like (#1-7)
-            # so consider whole thing just as title
-            title = title_text
-            series_info = ''
-        else:
-            # Check to make sure we have got all of the series information
-            series_info = series_info[:len(series_info)-1] #Strip off trailing ')'
-            while series_info.count(')') != series_info.count('('):
-                title_split = title.rpartition('(')
-                title = title_split[0].strip()
-                series_info = title_split[2] + '(' + series_info
-        if series_info:
-            series_partition = series_info.rpartition('#')
-            series_name = series_partition[0].strip()
-            if series_name.endswith(','):
-                series_name = series_name[:-1]
-            series_index = series_partition[2].strip()
-            if series_index.find('-'):
-                # The series is specified as 1-3, 1-7 etc.
-                # In future we may offer config options to decide what to do,
-                # such as "Use start number", "Use value xxx" like 0 etc.
-                # For now will just take the start number and use that
-                series_index = series_index.partition('-')[0].strip()
-            try:
-                return (title.strip(), series_name, float(series_index))
-            except ValueError:
-                # We have a series index which isn't really a series index
-                title = title_text
-        return (title.strip(), None, None)
-
-    def parse_authors(self, root):
-        base_node = root.xpath('//li[@class="metadata_writer"]')[0]
-        if not base_node:
-            return
-
-        authors = base_node.xpath('./span/a/text()')
-        self.log.debug(authors)
-        author_roles = map(lambda x: re.sub(',', '', x.strip()), base_node.xpath('./span/text()'))
-        self.log.debug(author_roles)
-        author_index_max = author_roles.index(u'저')
-        translator_index_max = author_roles.index(u'역')
-        for i in range(author_index_max + 1, translator_index_max + 1):
-            self.log.info(i)
-            authors[i] = authors[i] + u'(역자)'
-        self.log.info(authors)
-        get_all_authors = cfg.plugin_prefs[cfg.STORE_NAME][cfg.KEY_GET_ALL_AUTHORS]
-        if get_all_authors:
-            return authors
-        else:
-            return authors[0:author_index_max]   
-
-    def parse_publisher_date(self, root):
-        # Build a dict of authors with their contribution if any in values
-        base_node = root.xpath('//ul[@class="info_metadata02_wrap"]')[0]
-        if not base_node:
-            return
-
-        publisher_text = base_node.xpath('.//span[@itemprop="publisher"]//span/text()')[0]
-        pubdate_text = base_node.xpath('.//span[@itemprop="datePublished"]/@content')[0]
-
-        pubdate = self._convert_date_text(pubdate_text)
-        return (publisher_text, pubdate)
-
-    def parse_rating(self, root):
-        rating_node = root.xpath('//meta[@itemprop="ratingValue"]/@content')
-        if rating_node:
-            rating_text = rating_node[0]
-            # 네이버 평점은 10점 만점임
-            rating_value = float(rating_text)
-            return rating_value
-
-    def parse_comments(self, root):
-        # Look for description in a second span that gets expanded when interactively displayed [@id="display:none"]
-        description_node = root.xpath('//div[@id="introduce_book"]')
-        if description_node:
-            desc = description_node[0] if len(description_node) == 1 else description_node[1]
-            less_link = desc.xpath('button[@class="view_more"]')
-            if less_link is not None and len(less_link):
-                desc.remove(less_link[0])
-            comments = tostring(desc, method='html', encoding=unicode).strip()
-            while comments.find('  ') >= 0:
-                comments = comments.replace('  ',' ')
-            comments = sanitize_comments_html(comments)
-            return comments
-
-    def parse_cover(self, root):
-        imgcol_node = root.xpath('//meta[@property="og:image"]/@content')
-        if imgcol_node:
-            img_url = imgcol_node[0]
-            # Unfortunately Goodreads sometimes have broken links so we need to do
-            # an additional request to see if the URL actually exists
-            info = self.browser.open_novisit(img_url, timeout=self.timeout).info()
-            if int(info.getheader('Content-Length')) > 1000:
-                return img_url
-            else:
-                self.log.warning('Broken image for url: %s'%img_url)
-
-    def parse_isbn(self, root):
-        isbn_nodes = root.xpath('//meta[@property="books:isbn"]/@content')
-        for node in isbn_nodes:
-            text = node.strip()
-            match = re.search('([0-9A-Z]{10,})', text)
-            if match:
-                isbn_text = match.group(1)
-                self.log.info('ISBN is %s'%isbn_text)
-                
-        return isbn_text.strip()
 
     def parse_tags(self, root):
         # Goodreads does not have "tags", but it does have Genres (wrapper around popular shelves)
@@ -361,13 +158,3 @@ class Worker(Thread): # Get details
                     if tag not in tags_to_add:
                         tags_to_add.append(tag)
         return list(tags_to_add)
-
-    def _convert_date_text(self, date_text):
-        year = int(date_text[0:4])
-        month = int(date_text[4:6]) 
-        day = int(date_text[6:])
-        from calibre.utils.date import utc_tz
-        return datetime.datetime(year, month, day, tzinfo=utc_tz)
-
-    def _parse_language(self, root):
-        return "Korean"
