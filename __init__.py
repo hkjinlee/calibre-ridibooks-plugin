@@ -28,7 +28,7 @@ class RidiBooks(Source):
     name = 'RidiBooks'
     description = _('Downloads metadata and covers from ridibooks.com')
     author = 'Jin, Heonkyu <heonkyu.jin@gmail.com>'
-    version = (0, 0, 1)
+    version = (0, 0, 2)
     minimum_calibre_version = (0, 8, 0)
 
     capabilities = frozenset(['identify', 'cover'])
@@ -274,6 +274,16 @@ if __name__ == '__main__': # tests
                 series_test('테메레르', 6.0)
             ]
         ),
+
+        (# 나홀로 여행 컨설팅북
+            {
+                'title':u"나홀로 여행 컨설팅북", 
+            },
+            [
+                title_test(u"나홀로 여행 컨설팅북", exact=True),
+                authors_test([u'이주영']),
+            ]
+        )
     ], fail_missing_meta=False)
 
 

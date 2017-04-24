@@ -1,9 +1,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2017-02-05 22:47+0900\n"
-"PO-Revision-Date: 2017-02-05 22:48+0900\n"
-"Last-Translator: \n"
+"POT-Creation-Date: 2015-05-31 18:17+0900\n"
+"PO-Revision-Date: 2017-02-05 23:16+0900\n"
+"Last-Translator: Jin, Heonkyu <heonkyu.jin@gmail.com>\n"
 "Language-Team: \n"
 "Language: ko\n"
 "MIME-Version: 1.0\n"
@@ -14,36 +14,36 @@ msgstr ""
 "Plural-Forms: nplurals=1; plural=0;\n"
 "X-Poedit-SearchPath-0: .\n"
 
-#: __init__.py:29
+#: __init__.py:26
 msgid "Downloads metadata and covers from ridibooks.com"
-msgstr "리디북스(ridibooks.com)에서 책정보와 표지를 다운로드합니다"
+msgstr "리디북스(ridibooks.com)에서 책 정보와 표지 다운로드"
 
 #: common_utils.py:236
 msgid "Restart required"
-msgstr "재시작 필요"
+msgstr "다시 시작해야 합니다"
 
 #: common_utils.py:237
 msgid "Title image not found - you must restart Calibre before using this plugin!"
-msgstr "표지 이미지 없음 - 이 플러그인을 사용하려면 Calibre를 재시작해야 합니다"
+msgstr ""
 
 #: common_utils.py:517
 msgid "Undefined"
-msgstr ""
+msgstr "없음"
 
 #: common_utils.py:603
 msgid "Restart calibre now"
-msgstr ""
+msgstr "calibre를 재시작하세요"
 
 #: config.py:117
-msgid "Ridibooks Genre"
-msgstr "리디북스 장르"
+msgid "Naverbook Genre"
+msgstr ""
 
 #: config.py:117
 msgid "Maps to Calibre Tag(s)"
 msgstr ""
 
 #: config.py:187
-msgid "Ridibooks genre to calibre tag mappings"
+msgid "Naverbook genre to calibre tag mappings"
 msgstr ""
 
 #: config.py:200
